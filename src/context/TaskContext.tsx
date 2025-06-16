@@ -1,33 +1,49 @@
-import React, { useState } from "react";
-import { Container, Typography, Box } from "@mui/material";
-import { TaskForm } from "../components/TaskForm";
+import React, { createContext, useReducer, useContext, ReactNode } from "react";
 import { Task, BaseTask } from "../types/task";
 
-const App: React.FC = () => {
-  const [tasks, setTasks] = useState<Task[]>([]);
+type State = {
+  tasks: Task[];
+};
 
-  const handleAddTask = (taskData: Omit<BaseTask, "id" | "createdAt">) => {
-    const newTask: Task = {
-      ...taskData,
-      id: crypto.randomUUID(), 
-      createdAt: new Date(),
-    };
+type Action =
+  | { type: "ADD_TASK"; payload: Omit<BaseTask, "id" | "createdAt"> }
+  | { type: "DELETE_TASK"; payload: { id: string } };
 
-    setTasks((prev) => [...prev, newTask]);
-  };
+const TaskContext = createContext<{
+  state: State;
+  dispatch: React.Dispatch<Action>;
+} | undefined>(undefined);
+
+const taskReducer = (state: State, action: Action): State => {
+  switch (action.type) {
+    case "ADD_TASK":
+      const newTask: Task = {
+        ...action.payload,
+        id: crypto.randomUUID(),
+        createdAt: new Date(),
+      };
+      return { tasks: [...state.tasks, newTask] };
+
+    case "DELETE_TASK":
+      return { tasks: state.tasks.filter(task => task.id !== action.payload.id) };
+
+    default:
+      return state;
+  }
+};
+
+export const TaskProvider = ({ children }: { children: ReactNode }) => {
+  const [state, dispatch] = useReducer(taskReducer, { tasks: [] });
 
   return (
-    <Container maxWidth="sm" sx={{ mt: 5 }}>
-      <Typography variant="h4" gutterBottom>Task Dashboard</Typography>
-      
-      <TaskForm onAdd={handleAddTask} />
-
-      <Box mt={4}>
-        <Typography variant="h6">Current Tasks:</Typography>
-        <pre>{JSON.stringify(tasks, null, 2)}</pre> {/* For previewing tasks */}
-      </Box>
-    </Container>
+    <TaskContext.Provider value={{ state, dispatch }}>
+      {children}
+    </TaskContext.Provider>
   );
 };
 
-export default App;
+export const useTaskContext = () => {
+  const context = useContext(TaskContext);
+  if (!context) throw new Error("useTaskContext must be used within a TaskProvider");
+  return context;
+};
